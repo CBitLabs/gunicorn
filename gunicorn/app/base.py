@@ -8,6 +8,14 @@ import os
 import sys
 import traceback
 
+try:
+    import posix_ipc
+    if not posix_ipc.SEMAPHORE_VALUE_SUPPORTED:
+        # Probably MacOS
+        posix_ipc = None
+except ImportError:
+    posix_ipc = None
+
 from gunicorn._compat import execfile_
 from gunicorn import util
 from gunicorn.arbiter import Arbiter
@@ -65,9 +73,26 @@ class BaseApplication(object):
     def wsgi(self):
         if self.callable is None:
             self.callable = self.load()
-        return self.callable
+
+        if posix_ipc and self.cfg.count_active_semaphore:
+            semaphore = posix_ipc.Semaphore(self.cfg.count_active_semaphore)
+            def counting_wsgi(*args, **kwargs):
+                with semaphore:
+                    self.callable(*args, **kwargs)
+            return counting_wsgi
+        else:
+            return self.callable
 
     def run(self):
+        if posix_ipc and self.cfg.count_active_semaphore:
+            # We want to get a new semaphore with the supplied name
+            try:
+                # Get rid of the existing semaphore (if any)
+                semaphore = posix_ipc.Semaphore(self.cfg.count_active_semaphore)
+                semaphore.unlink()
+            except Exception:
+                pass
+            semaphore = posix_ipc.Semaphore(self.cfg.count_active_semaphore, mode=posix_ipc.O_CREAT, initial_value=posix_ipc.SEMAPHORE_VALUE_MAX)
         try:
             Arbiter(self).run()
         except RuntimeError as e:

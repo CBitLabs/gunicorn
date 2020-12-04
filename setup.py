@@ -47,7 +47,7 @@ with open(fname) as f:
     tests_require = [l.strip() for l in f.readlines()]
 
 if sys.version_info[:2] < (3, 3):
-    tests_require.append('mock')
+    tests_require.append('mock<4')
 if sys.version_info[:2] < (2, 7):
     tests_require.append('unittest2')
 

@@ -20,6 +20,11 @@ import sys
 import textwrap
 import shlex
 
+try:
+    import posix_ipc
+except ImportError:
+    posix_ipc = None
+
 from gunicorn import __version__
 from gunicorn import _compat
 from gunicorn.errors import ConfigError
@@ -1858,3 +1863,24 @@ class PasteGlobalConf(Setting):
 
         .. versionadded:: 19.7
         """
+
+if posix_ipc and posix_ipc.SEMAPHORE_VALUE_SUPPORTED:
+    class CountActiveSemaphore(Setting):
+        name = "count_active_semaphore"
+        cli = ["--count-active-semaphore"]
+        meta = "CONF"
+        validator = validate_string
+        default = "/tmp/gunicorn.tmp"
+
+        desc = """\
+            Set a semaphore name to allowing monitoring of the number of simultaneuous active requests. The
+            posix_ipc module must be installed to enable this.
+
+            The number of active requests is SEMAPHORE_VALUE_MAX - <semaphore value>
+
+            It can be supplied on the command line: e.g.
+
+                $ gunicorn -b 127.0.0.1:8000 --count-active-semaphore /tmp/gunicorn.sem
+
+            .. versionadded:: xx
+            """
